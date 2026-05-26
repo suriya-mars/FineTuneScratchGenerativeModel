@@ -1,0 +1,139 @@
+Stage 1 — Data Preparation
+Goal: Convert raw CSVs into verified CoT training triples
+
+
+data/raw/train.csv  (9,500 rows: id, prompt, answer)
+        ↓
+1a. Categorize examples by rule type
+    (bit-ops, cipher, numeric, unit-conversion, physics, symbol)
+        ↓
+1b. Generate CoT rationales via teacher model (Claude/GPT-4)
+    prompt → "think step by step → Answer: X"
+        ↓
+1c. Verify: keep only rationales where extracted answer == ground truth
+    Target: ~7,500–8,000 verified triples (~80% pass rate)
+        ↓
+1d. Stratified split (by category)
+    Train: 85%  →  data/splits/train_cot.jsonl
+    Val:   15%  →  data/splits/val_cot.jsonl
+
+data/raw/test.csv  (3 rows, no labels) → held for final submission
+Stage 2 — Tokenization & Dataset Pipeline
+Goal: Convert JSONL triples into model-ready tensors
+
+
+2a. Choose prompt template and tokenize
+    ### Problem: {prompt}
+    ### Reasoning: {cot}
+    ### Answer: {answer}
+
+2b. Apply loss masking
+    Labels[:prompt_end] = -100   ← mask question tokens
+    Labels[prompt_end:] = token_ids  ← train on CoT + answer
+
+2c. Verify max_seq_len distribution
+    (your prompts avg 301 chars → 512 tokens is sufficient)
+
+2d. Build DataLoader with dynamic padding
+Stage 3 — Model Setup
+Goal: Configure base model + LoRA for efficient fine-tuning
+
+
+3a. Select base model
+    Recommended: Qwen2.5-1.5B-Instruct or Phi-3-mini
+
+3b. Load in 4-bit (QLoRA) to fit on single GPU
+
+3c. Attach LoRA adapters
+    target_modules: [q_proj, v_proj]
+    rank: 16
+    alpha: 32
+    dropout: 0.05
+
+3d. Verify trainable params (~1–2% of total)
+Stage 4 — SFT Training (Teacher Distillation)
+Goal: Train model to generate correct CoT + answer
+
+
+4a. Configure training
+    lr: 2e-4, epochs: 3–5
+    batch: 8, grad_accum: 4 (effective batch 32)
+    scheduler: cosine with warmup (100 steps)
+
+4b. Training loop
+    for each batch:
+        forward pass (full sequence)
+        loss on CoT + answer tokens only
+        backward + optimizer step
+
+4c. Checkpoint every 500 steps
+
+4d. Track metrics per epoch
+    - Training loss
+    - Val loss
+    - Val exact-match accuracy (by category)
+Stage 5 — Evaluation & Error Analysis
+Goal: Understand where the model fails before Stage 6
+
+
+5a. Run inference on val set (greedy decoding)
+    max_new_tokens: 256
+    stop at <EOS>
+
+5b. Extract answer from "### Answer:" section
+
+5c. Compute metrics
+    - Overall exact match accuracy
+    - Per-category accuracy breakdown
+    - Failure case samples per category
+
+5d. Identify weakest category → inform Stage 6
+Stage 6 — GRPO Self-Improvement (Optional Stage 2 RL)
+Goal: Push accuracy further using the SFT model as starting point
+
+
+6a. Use SFT checkpoint as initial policy
+
+6b. For each prompt, sample N=8 responses
+
+6c. Score each response
+    reward = 1 if extracted_answer == ground_truth else 0
+
+6d. GRPO update
+    advantage = (reward - mean_reward) / std_reward
+    policy gradient update using group-relative advantage
+
+6e. Repeat for weakest categories first
+
+6f. Stop when val accuracy plateaus
+Stage 7 — Final Inference on Test Set
+Goal: Generate predictions for test.csv submission
+
+
+7a. Load best checkpoint (highest val exact-match)
+
+8b. Run inference on test.csv (3 rows)
+    Generate full CoT + answer
+
+7c. Extract final answers
+
+7d. Write outputs/results/submission.csv
+    id, answer
+Stage 8 — Experiment Tracking & Reproducibility
+Goal: Keep everything reproducible across runs
+
+
+8a. Log all runs: loss, accuracy, config → outputs/logs/
+8b. Save rationale generation config (model used, temperature, prompt)
+8c. Seed everything (torch, numpy, random) for reproducibility
+8d. Save LoRA adapter separately from base model weights
+Summary Timeline
+
+Stage 1  →  Data + CoT generation    (most time: API calls for 9,500 rows)
+Stage 2  →  Tokenization pipeline     (1 day)
+Stage 3  →  Model + LoRA setup        (half day)
+Stage 4  →  SFT training              (2–4 hours on single GPU)
+Stage 5  →  Evaluation                (1–2 hours)
+Stage 6  →  GRPO (optional)           (4–8 hours)
+Stage 7  →  Test inference            (minutes)
+Stage 8  →  Tracking (runs parallel to all stages)

@@ -1,0 +1,14 @@
+venv/
+__pycache__/
+*.pyc
+*.pyo
+.env
+outputs/checkpoints/
+outputs/logs/
+outputs/results/
+data/raw/
+data/processed/
+data/splits/
+*.egg-info/
+.DS_Store
+wandb/
