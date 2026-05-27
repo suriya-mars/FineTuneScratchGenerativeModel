@@ -1,6 +1,8 @@
 #!/bin/bash
 set -e
 
+pip install -q huggingface_hub
+
 # Authenticate with HuggingFace
 hf login --token "$HF_TOKEN"
 
@@ -8,7 +10,7 @@ rm -rf /workspace/project
 git clone https://github.com/suriya-mars/FineTuneScratchGenerativeModel.git /workspace/project
 cd /workspace/project
 
-pip install -q unsloth trl peft datasets transformers accelerate bitsandbytes huggingface_hub
+pip install -q unsloth trl peft datasets transformers accelerate bitsandbytes
 
 hf download suriya-mars/wonderland-data train.csv --local-dir data/raw --repo-type dataset
 
