@@ -4,7 +4,7 @@ set -e
 pip install -q huggingface_hub
 
 # Authenticate with HuggingFace
-hf login --token "$HF_TOKEN"
+python -c "from huggingface_hub import login; login(token='$HF_TOKEN')"
 
 rm -rf /workspace/project
 git clone https://github.com/suriya-mars/FineTuneScratchGenerativeModel.git /workspace/project
@@ -12,7 +12,15 @@ cd /workspace/project
 
 pip install -q unsloth trl peft datasets transformers accelerate bitsandbytes
 
-hf download suriya-mars/wonderland-data train.csv --local-dir data/raw --repo-type dataset
+# Download train.csv
+python -c "
+from huggingface_hub import hf_hub_download
+import shutil, os
+os.makedirs('data/raw', exist_ok=True)
+path = hf_hub_download(repo_id='suriya-mars/wonderland-data', filename='train.csv', repo_type='dataset')
+shutil.copy(path, 'data/raw/train.csv')
+print('Downloaded train.csv')
+"
 
 mkdir -p outputs/checkpoints/stage2
 
@@ -21,10 +29,16 @@ PYTORCH_ALLOC_CONF=expandable_segments:True python scripts/train_stage2.py 2>&1 
 # Upload only if training completed successfully
 if [ -d "outputs/checkpoints/stage2/final" ]; then
     echo "Uploading Stage 2 adapter to HuggingFace..."
-    hf upload suriya-mars/qwen2.5-3b-wonderland-stage2 outputs/checkpoints/stage2/final --repo-type model
+    python -c "
+from huggingface_hub import HfApi
+api = HfApi()
+api.create_repo('suriya-mars/qwen2.5-3b-wonderland-stage2', repo_type='model', exist_ok=True)
+api.upload_folder(folder_path='outputs/checkpoints/stage2/final', repo_id='suriya-mars/qwen2.5-3b-wonderland-stage2', repo_type='model')
+print('Upload complete')
+"
     echo "TRAINING_DONE"
 else
     echo "ERROR: outputs/checkpoints/stage2/final not found — training may have failed"
-    cat /workspace/stage2_log.txt
+    tail -50 /workspace/stage2_log.txt
     exit 1
 fi
