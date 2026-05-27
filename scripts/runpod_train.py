@@ -16,7 +16,7 @@ runpod.api_key = os.environ["RUNPOD_API_KEY"]
 
 SETUP_CMD = (
     "bash -c 'curl -fsSL https://raw.githubusercontent.com"
-    "/suriya-mars/FineTuneScratchGenerativeModel/main/scripts/runpod_setup.sh | bash'"
+    "/suriya-mars/FineTuneScratchGenerativeModel/master/scripts/runpod_setup.sh | bash'"
 )
 
 
