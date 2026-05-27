@@ -85,10 +85,9 @@ def main() -> None:
     with open("configs/model_config.yaml") as f:
         config = yaml.safe_load(f)
 
-    adapter_path = config["training"]["output_dir"] + "/final"
-    stage2_dir   = config["training"]["output_dir"] + "/stage2"
+    stage2_dir = config["training"]["output_dir"] + "/stage2"
 
-    print(f"Loading base model + Stage 1 adapter from {adapter_path} ...")
+    print("Loading base model + Stage 1 adapter from suriya-mars/qwen2.5-3b-wonderland-stage1 ...")
     model, tokenizer = FastLanguageModel.from_pretrained(
         model_name="unsloth/Qwen2.5-3B-bnb-4bit",
         max_seq_length=config["model"]["max_seq_len"],
@@ -97,7 +96,7 @@ def main() -> None:
     )
 
     # Load existing LoRA adapter as trainable — starts from Stage 1 weights
-    model = PeftModel.from_pretrained(model, adapter_path, is_trainable=True)
+    model = PeftModel.from_pretrained(model, "suriya-mars/qwen2.5-3b-wonderland-stage1", is_trainable=True)
 
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
@@ -113,17 +112,17 @@ def main() -> None:
     grpo_config = GRPOConfig(
         output_dir=stage2_dir,
 
-        # ── memory-safe settings for 6GB VRAM ───────────────────────────
-        per_device_train_batch_size=1,
-        num_generations=2,
-        max_prompt_length=128,
-        max_completion_length=128,
-        gradient_accumulation_steps=8,
-        beta=0.0,                      # no KL term → no reference model → saves ~1.5GB VRAM
+        # ── RTX 3090 24GB settings ───────────────────────────────────────
+        per_device_train_batch_size=4,   # was 1
+        num_generations=8,               # was 2 — more rollouts = better reward signal
+        max_prompt_length=256,           # was 128
+        max_completion_length=512,       # was 128 — full reasoning chains allowed
+        gradient_accumulation_steps=4,   # was 8 — effective batch = 4*4 = 16 prompts
+        beta=0.01,                       # was 0.0 — small KL keeps model from drifting too far
 
         # ── optimisation ────────────────────────────────────────────────
         num_train_epochs=1,
-        learning_rate=5e-6,            # very low — fine GRPO adjustment
+        learning_rate=5e-6,
         bf16=True,
         fp16=False,
         optim="adamw_8bit",

@@ -8,11 +8,13 @@ Usage:
 
 import os
 import time
+from pathlib import Path
+from huggingface_hub import snapshot_download
 import runpod
 
 runpod.api_key = os.environ["RUNPOD_API_KEY"]
 
-GITHUB_REPO   = "https://github.com/YOUR_USERNAME/YOUR_REPO.git"
+GITHUB_REPO   = "https://github.com/suriya-mars/FineTuneScratchGenerativeModel.git"
 HF_TOKEN      = os.environ.get("HF_TOKEN", "")   # needed to pull models if private
 
 SETUP_COMMANDS = f"""
@@ -20,13 +22,16 @@ set -e
 git clone {GITHUB_REPO} /workspace/project
 cd /workspace/project
 
-pip install -q unsloth trl peft datasets transformers accelerate bitsandbytes
+pip install -q unsloth trl peft datasets transformers accelerate bitsandbytes huggingface_hub
 
-# Copy Stage 1 adapter if you uploaded it to RunPod volume
-# cp /runpod-volume/final/* outputs/checkpoints/final/
+# Download train.csv from HuggingFace
+huggingface-cli download suriya-mars/wonderland-data train.csv --local-dir data/raw
 
 PYTORCH_ALLOC_CONF=expandable_segments:True \\
     python scripts/train_stage2.py 2>&1 | tee /workspace/stage2_log.txt
+
+# Upload Stage 2 adapter back to HuggingFace when done
+huggingface-cli upload suriya-mars/qwen2.5-3b-wonderland-stage2 outputs/checkpoints/stage2/final .
 
 echo "TRAINING_DONE"
 """
@@ -64,10 +69,20 @@ def terminate_pod(pod_id: str) -> None:
     print(f"Pod {pod_id} terminated.")
 
 
+def download_adapter(local_dir: str = "outputs/checkpoints/stage2/final") -> None:
+    print("Downloading Stage 2 adapter from HuggingFace...")
+    Path(local_dir).mkdir(parents=True, exist_ok=True)
+    snapshot_download(
+        repo_id="suriya-mars/qwen2.5-3b-wonderland-stage2",
+        local_dir=local_dir,
+    )
+    print(f"Saved to {local_dir}")
+
+
 if __name__ == "__main__":
     pod_id = launch_pod()
     try:
         wait_for_completion(pod_id)
-        print("\nDone! Download outputs/checkpoints/stage2/ from the pod volume.")
+        download_adapter()
     finally:
         terminate_pod(pod_id)
