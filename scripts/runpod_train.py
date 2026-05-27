@@ -66,6 +66,10 @@ def download_adapter(local_dir: str = "outputs/checkpoints/stage2/final") -> Non
 
 
 if __name__ == "__main__":
+    if not os.environ.get("HF_TOKEN"):
+        raise SystemExit("ERROR: HF_TOKEN is not set. Run: export HF_TOKEN=your_token")
+    if not os.environ.get("RUNPOD_API_KEY"):
+        raise SystemExit("ERROR: RUNPOD_API_KEY is not set.")
     pod_id = launch_pod()
     try:
         wait_for_completion(pod_id)

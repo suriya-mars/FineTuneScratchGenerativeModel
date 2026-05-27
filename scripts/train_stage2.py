@@ -12,22 +12,23 @@ Usage:
     python scripts/train_stage2.py
 """
 
-# ── Python 3.14 / datasets compatibility shim ────────────────────────────────
-import unsloth
-import pickle as _pickle
-if hasattr(_pickle, "_Pickler"):
-    _orig_base = _pickle._Pickler._batch_setitems
-    def _base_batch(self, items, obj=None):
-        _orig_base(self, items, obj if obj is not None else {})
-    _pickle._Pickler._batch_setitems = _base_batch
-try:
-    import datasets.utils._dill as _dd
-    _orig_dd = _dd.Pickler._batch_setitems
-    def _dd_batch(self, items, obj=None):
-        _orig_dd(self, items)
-    _dd.Pickler._batch_setitems = _dd_batch
-except Exception:
-    pass
+# ── Python 3.14 / datasets compatibility shim (no-op on 3.10) ────────────────
+import sys, unsloth
+if sys.version_info >= (3, 14):
+    import pickle as _pickle
+    if hasattr(_pickle, "_Pickler"):
+        _orig_base = _pickle._Pickler._batch_setitems
+        def _base_batch(self, items, obj=None):
+            _orig_base(self, items, obj if obj is not None else {})
+        _pickle._Pickler._batch_setitems = _base_batch
+    try:
+        import datasets.utils._dill as _dd
+        _orig_dd = _dd.Pickler._batch_setitems
+        def _dd_batch(self, items, obj=None):
+            _orig_dd(self, items)
+        _dd.Pickler._batch_setitems = _dd_batch
+    except Exception:
+        pass
 # ─────────────────────────────────────────────────────────────────────────────
 
 import os
