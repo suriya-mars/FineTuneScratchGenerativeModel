@@ -32,6 +32,7 @@ def launch_pod() -> str:
         volume_in_gb=20,
         container_disk_in_gb=20,
         docker_args=SETUP_CMD,
+        env={"HF_TOKEN": os.environ.get("HF_TOKEN", "")},
     )
     pod_id = pod["id"]
     print(f"Pod launched: {pod_id}")
