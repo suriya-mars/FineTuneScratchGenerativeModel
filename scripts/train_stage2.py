@@ -32,7 +32,15 @@ if sys.version_info >= (3, 14):
 # ─────────────────────────────────────────────────────────────────────────────
 
 import os
-os.environ["TORCHDYNAMO_DISABLE"] = "1"   # skip torch.compile — saves 30-60min startup
+os.environ["TORCHDYNAMO_DISABLE"] = "1"
+os.environ["TORCH_COMPILE_DISABLE"] = "1"
+os.environ["UNSLOTH_COMPILE_DISABLE"] = "1"
+
+import torch
+torch.compile = lambda fn=None, *a, **kw: (fn if fn is not None else lambda f: f)
+import torch._dynamo
+torch._dynamo.config.disable = True
+torch._dynamo.reset()
 
 import csv
 import sys
