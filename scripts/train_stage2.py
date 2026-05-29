@@ -6,32 +6,14 @@ Loads the Stage 1 CoT checkpoint and runs GRPO:
   - Reward = 1.0 if final answer matches ground truth, else 0.0
   - No CoT rationales needed — only (prompt, answer) pairs
 
-This closes the train/inference gap from Stage 1's teacher forcing.
-
 Usage:
     python scripts/train_stage2.py
 """
 
-# ── Python 3.14 / datasets compatibility shim (no-op on 3.10) ────────────────
-import sys, unsloth
-if sys.version_info >= (3, 14):
-    import pickle as _pickle
-    if hasattr(_pickle, "_Pickler"):
-        _orig_base = _pickle._Pickler._batch_setitems
-        def _base_batch(self, items, obj=None):
-            _orig_base(self, items, obj if obj is not None else {})
-        _pickle._Pickler._batch_setitems = _base_batch
-    try:
-        import datasets.utils._dill as _dd
-        _orig_dd = _dd.Pickler._batch_setitems
-        def _dd_batch(self, items, obj=None):
-            _orig_dd(self, items)
-        _dd.Pickler._batch_setitems = _dd_batch
-    except Exception:
-        pass
-# ─────────────────────────────────────────────────────────────────────────────
-
 import os
+import sys
+
+# Disable torch.compile / dynamo before any other imports
 os.environ["TORCHDYNAMO_DISABLE"] = "1"
 os.environ["TORCH_COMPILE_DISABLE"] = "1"
 os.environ["UNSLOTH_COMPILE_DISABLE"] = "1"
@@ -43,24 +25,21 @@ torch._dynamo.config.disable = True
 torch._dynamo.reset()
 
 import csv
-import sys
 from pathlib import Path
 
 import yaml
 from datasets import Dataset as HFDataset
-from peft import PeftModel
+from transformers import AutoTokenizer
+from peft import AutoPeftModelForCausalLM
 from trl import GRPOTrainer, GRPOConfig
-from unsloth import FastLanguageModel
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from src.data.preprocess import extract_answer
 
 
 def load_train_csv(csv_path: str) -> HFDataset:
-    """Load train.csv as a GRPO dataset — just prompt + ground_truth."""
     with open(csv_path, newline="", encoding="utf-8") as f:
         rows = list(csv.DictReader(f))
-
     records = []
     for row in rows:
         records.append({
@@ -71,12 +50,9 @@ def load_train_csv(csv_path: str) -> HFDataset:
 
 
 def make_reward_fn(dataset: HFDataset):
-    """Return a reward function that looks up ground truth by index."""
     ground_truths = dataset["ground_truth"]
 
     def reward_fn(completions, prompts, **kwargs):
-        # completions: list of generated strings (reasoning + answer)
-        # prompts: list of input prompts — use index to match ground truth
         rewards = []
         for i, completion in enumerate(completions):
             gt = ground_truths[i % len(ground_truths)]
@@ -96,16 +72,18 @@ def main() -> None:
 
     stage2_dir = config["training"]["output_dir"] + "/stage2"
 
-    print("Loading base model + Stage 1 adapter from suriya-mars/qwen2.5-3b-wonderland-stage1 ...")
-    model, tokenizer = FastLanguageModel.from_pretrained(
-        model_name="unsloth/Qwen2.5-3B-bnb-4bit",
-        max_seq_length=config["model"]["max_seq_len"],
-        dtype=None,
-        load_in_4bit=True,
-    )
+    adapter_repo = "suriya-mars/qwen2.5-3b-wonderland-stage1"
+    print(f"Loading Stage 1 adapter from {adapter_repo} ...")
 
-    # Load existing LoRA adapter as trainable — starts from Stage 1 weights
-    model = PeftModel.from_pretrained(model, "suriya-mars/qwen2.5-3b-wonderland-stage1", is_trainable=True)
+    # Load with plain transformers + PEFT — avoids Unsloth's buggy compiled GRPOTrainer
+    model = AutoPeftModelForCausalLM.from_pretrained(
+        adapter_repo,
+        torch_dtype=torch.bfloat16,
+        load_in_4bit=True,
+        is_trainable=True,
+        device_map="auto",
+    )
+    tokenizer = AutoTokenizer.from_pretrained(adapter_repo)
 
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
@@ -121,15 +99,13 @@ def main() -> None:
     grpo_config = GRPOConfig(
         output_dir=stage2_dir,
 
-        # ── RTX 3090 24GB settings ───────────────────────────────────────
-        per_device_train_batch_size=4,   # was 1
-        num_generations=8,               # was 2 — more rollouts = better reward signal
-        max_prompt_length=256,           # was 128
-        max_completion_length=512,       # was 128 — full reasoning chains allowed
-        gradient_accumulation_steps=4,   # was 8 — effective batch = 4*4 = 16 prompts
-        beta=0.01,                       # was 0.0 — small KL keeps model from drifting too far
+        per_device_train_batch_size=4,
+        num_generations=8,
+        max_prompt_length=256,
+        max_completion_length=512,
+        gradient_accumulation_steps=4,
+        beta=0.01,
 
-        # ── optimisation ────────────────────────────────────────────────
         num_train_epochs=1,
         learning_rate=5e-6,
         bf16=True,
@@ -139,7 +115,6 @@ def main() -> None:
         warmup_steps=50,
         max_grad_norm=0.1,
 
-        # ── logging / saving ────────────────────────────────────────────
         logging_steps=20,
         save_strategy="steps",
         save_steps=500,
