@@ -10,7 +10,7 @@ rm -rf /workspace/project
 git clone https://github.com/suriya-mars/FineTuneScratchGenerativeModel.git /workspace/project
 cd /workspace/project
 
-pip install -q unsloth trl peft datasets transformers accelerate bitsandbytes
+pip install -q trl peft datasets transformers accelerate bitsandbytes
 
 # Download train.csv
 python -c "
