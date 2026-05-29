@@ -24,7 +24,11 @@ print('Downloaded train.csv')
 
 mkdir -p outputs/checkpoints/stage2
 
-PYTORCH_ALLOC_CONF=expandable_segments:True python scripts/train_stage2.py 2>&1 | tee /workspace/stage2_log.txt
+TORCHDYNAMO_DISABLE=1 \
+TORCH_COMPILE_DISABLE=1 \
+UNSLOTH_COMPILE_DISABLE=1 \
+PYTORCH_ALLOC_CONF=expandable_segments:True \
+    python scripts/train_stage2.py 2>&1 | tee /workspace/stage2_log.txt
 
 # Upload only if training completed successfully
 if [ -d "outputs/checkpoints/stage2/final" ]; then
