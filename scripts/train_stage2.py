@@ -29,8 +29,8 @@ from pathlib import Path
 
 import yaml
 from datasets import Dataset as HFDataset
-from transformers import AutoTokenizer
-from peft import AutoPeftModelForCausalLM
+from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+from peft import PeftModel
 from trl import GRPOTrainer, GRPOConfig
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -73,16 +73,21 @@ def main() -> None:
     stage2_dir = config["training"]["output_dir"] + "/stage2"
 
     adapter_repo = "suriya-mars/qwen2.5-3b-wonderland-stage1"
-    print(f"Loading Stage 1 adapter from {adapter_repo} ...")
+    print(f"Loading base model + Stage 1 adapter from {adapter_repo} ...")
 
-    # Load with plain transformers + PEFT — avoids Unsloth's buggy compiled GRPOTrainer
-    model = AutoPeftModelForCausalLM.from_pretrained(
-        adapter_repo,
-        torch_dtype=torch.bfloat16,
+    bnb_config = BitsAndBytesConfig(
         load_in_4bit=True,
-        is_trainable=True,
+        bnb_4bit_compute_dtype=torch.bfloat16,
+        bnb_4bit_use_double_quant=True,
+        bnb_4bit_quant_type="nf4",
+    )
+
+    base_model = AutoModelForCausalLM.from_pretrained(
+        "Qwen/Qwen2.5-3B",
+        quantization_config=bnb_config,
         device_map="auto",
     )
+    model = PeftModel.from_pretrained(base_model, adapter_repo, is_trainable=True)
     tokenizer = AutoTokenizer.from_pretrained(adapter_repo)
 
     if tokenizer.pad_token is None:
