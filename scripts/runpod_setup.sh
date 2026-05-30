@@ -12,6 +12,18 @@ cd /workspace/project
 
 pip install -q "trl==0.24.0" peft datasets transformers accelerate bitsandbytes
 
+# mergekit stub — trl 0.24.0 hard-imports mergekit in callbacks.py
+python -c "
+import site, os
+sp = site.getsitepackages()[0]
+mk = os.path.join(sp, 'mergekit')
+os.makedirs(mk, exist_ok=True)
+open(os.path.join(mk, '__init__.py'), 'w').close()
+open(os.path.join(mk, 'config.py'), 'w').write('class MergeConfiguration: pass\n')
+open(os.path.join(mk, 'merge.py'), 'w').write('class MergeOptions: pass\ndef run_merge(*a,**kw): raise NotImplementedError\n')
+print('mergekit stub created')
+"
+
 # Download train.csv
 python -c "
 from huggingface_hub import hf_hub_download
