@@ -1,0 +1,9 @@
+trl==0.24.0
+peft
+transformers
+datasets
+accelerate
+bitsandbytes
+mergekit
+llm-blender
+pyyaml
