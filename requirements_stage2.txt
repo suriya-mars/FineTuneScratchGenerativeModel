@@ -1,6 +1,6 @@
 trl==0.24.0
 peft
-transformers==4.40.0
+transformers>=4.41.0,<4.42.0
 datasets
 accelerate
 bitsandbytes
