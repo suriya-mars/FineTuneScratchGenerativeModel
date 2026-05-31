@@ -107,10 +107,10 @@ def main() -> None:
     grpo_config = GRPOConfig(
         output_dir=stage2_dir,
 
-        per_device_train_batch_size=4,
-        num_generations=8,
-        max_completion_length=512,
-        gradient_accumulation_steps=4,
+        per_device_train_batch_size=1,
+        num_generations=2,
+        max_completion_length=128,
+        gradient_accumulation_steps=8,
         beta=0.01,
 
         num_train_epochs=1,
@@ -119,12 +119,12 @@ def main() -> None:
         fp16=False,
         optim="adamw_8bit",
         lr_scheduler_type="cosine",
-        warmup_steps=50,
+        warmup_steps=20,
         max_grad_norm=0.1,
 
-        logging_steps=20,
+        logging_steps=1,
         save_strategy="steps",
-        save_steps=500,
+        save_steps=200,
         save_total_limit=2,
         report_to="none",
         seed=42,
