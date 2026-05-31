@@ -37,13 +37,16 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from src.data.preprocess import extract_answer
 
 
+MAX_PROMPT_CHARS = 800  # ~256 tokens — truncate long prompts before they reach the model
+
 def load_train_csv(csv_path: str) -> HFDataset:
     with open(csv_path, newline="", encoding="utf-8") as f:
         rows = list(csv.DictReader(f))
     records = []
     for row in rows:
+        prompt = f"### Problem:\n{row['prompt']}\n\n### Reasoning:\n"
         records.append({
-            "prompt":       f"### Problem:\n{row['prompt']}\n\n### Reasoning:\n",
+            "prompt":       prompt[:MAX_PROMPT_CHARS],
             "ground_truth": row["answer"].strip(),
         })
     return HFDataset.from_list(records)
@@ -106,7 +109,6 @@ def main() -> None:
 
         per_device_train_batch_size=4,
         num_generations=8,
-        max_prompt_length=256,
         max_completion_length=512,
         gradient_accumulation_steps=4,
         beta=0.01,

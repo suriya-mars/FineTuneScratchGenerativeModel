@@ -25,7 +25,7 @@ SETUP_CMD = (
 def launch_pod() -> str:
     pod = runpod.create_pod(
         name="grpo-stage2",
-        image_name="runpod/pytorch:2.1.0-py3.10-cuda11.8.0-devel",
+        image_name="runpod/pytorch:2.4.0-py3.11-cuda12.4.1-devel",
         gpu_type_id="NVIDIA GeForce RTX 3090",   # 24GB VRAM
         cloud_type="SECURE",
         gpu_count=1,
