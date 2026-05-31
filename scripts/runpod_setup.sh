@@ -24,6 +24,13 @@ print('Downloaded train.csv')
 
 mkdir -p outputs/checkpoints/stage2
 
+# Create HF repo upfront so upload succeeds after training
+python -c "
+from huggingface_hub import HfApi
+HfApi().create_repo('suriya-mars/qwen2.5-3b-wonderland-stage2', repo_type='model', exist_ok=True)
+print('HF repo ready')
+"
+
 TORCHDYNAMO_DISABLE=1 \
 TORCH_COMPILE_DISABLE=1 \
 UNSLOTH_COMPILE_DISABLE=1 \
