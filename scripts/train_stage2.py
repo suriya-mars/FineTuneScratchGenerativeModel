@@ -52,13 +52,12 @@ def load_train_csv(csv_path: str) -> HFDataset:
     return HFDataset.from_list(records)
 
 
-def make_reward_fn(dataset: HFDataset):
-    ground_truths = dataset["ground_truth"]
-
+def make_reward_fn():
     def reward_fn(completions, prompts, **kwargs):
+        # ground_truth is passed by TRL from the dataset, repeated num_generations times
+        ground_truths = kwargs["ground_truth"]
         rewards = []
-        for i, completion in enumerate(completions):
-            gt = ground_truths[i % len(ground_truths)]
+        for completion, gt in zip(completions, ground_truths):
             predicted = extract_answer(completion)
             if predicted and predicted.lower().strip() == gt.lower().strip():
                 rewards.append(1.0)
@@ -102,7 +101,7 @@ def main() -> None:
     train_ds = load_train_csv("data/raw/train.csv")
     print(f"  rows={len(train_ds)}  columns={train_ds.column_names}")
 
-    reward_fn = make_reward_fn(train_ds)
+    reward_fn = make_reward_fn()
 
     grpo_config = GRPOConfig(
         output_dir=stage2_dir,
