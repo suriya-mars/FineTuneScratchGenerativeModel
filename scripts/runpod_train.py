@@ -58,11 +58,15 @@ def terminate_pod(pod_id: str) -> None:
 def download_adapter(local_dir: str = "outputs/checkpoints/stage2/final") -> None:
     print("Downloading Stage 2 adapter from HuggingFace...")
     Path(local_dir).mkdir(parents=True, exist_ok=True)
-    snapshot_download(
-        repo_id="suriya-mars/qwen2.5-3b-wonderland-stage2",
-        local_dir=local_dir,
-    )
-    print(f"Saved to {local_dir}")
+    try:
+        snapshot_download(
+            repo_id="suriya-mars/qwen2.5-3b-wonderland-stage2",
+            local_dir=local_dir,
+        )
+        print(f"Saved to {local_dir}")
+    except Exception as e:
+        print(f"Download failed: {e}")
+        print("Training may not have completed. Check RunPod logs.")
 
 
 if __name__ == "__main__":
