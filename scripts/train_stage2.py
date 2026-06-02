@@ -54,15 +54,16 @@ def load_train_csv(csv_path: str) -> HFDataset:
 
 def make_reward_fn():
     def reward_fn(completions, prompts, **kwargs):
-        # ground_truth is passed by TRL from the dataset, repeated num_generations times
         ground_truths = kwargs["ground_truth"]
         rewards = []
         for completion, gt in zip(completions, ground_truths):
             predicted = extract_answer(completion)
             if predicted and predicted.lower().strip() == gt.lower().strip():
-                rewards.append(1.0)
+                rewards.append(1.0)   # correct answer
+            elif "### Answer:" in completion:
+                rewards.append(0.2)   # wrong answer but correct format
             else:
-                rewards.append(0.0)
+                rewards.append(0.0)   # no answer at all
         return rewards
 
     return reward_fn
@@ -106,16 +107,16 @@ def main() -> None:
     grpo_config = GRPOConfig(
         output_dir=stage2_dir,
 
-        per_device_train_batch_size=1,
-        num_generations=2,
-        max_completion_length=400,
-        gradient_accumulation_steps=8,
+        per_device_train_batch_size=4,
+        num_generations=4,
+        max_completion_length=300,
+        gradient_accumulation_steps=2,
         beta=0.01,
 
         num_train_epochs=1,
         learning_rate=5e-6,
-        bf16=True,
-        fp16=False,
+        bf16=torch.cuda.is_available() and torch.cuda.is_bf16_supported(),
+        fp16=torch.cuda.is_available() and not torch.cuda.is_bf16_supported(),
         optim="adamw_8bit",
         lr_scheduler_type="cosine",
         warmup_steps=20,

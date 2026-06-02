@@ -23,10 +23,10 @@ SETUP_CMD = (
 
 
 GPU_PRIORITY = [
+    "NVIDIA A100 80GB PCIe",     # 80GB — fastest
+    "NVIDIA A100-SXM4-80GB",     # 80GB — HPC variant
     "NVIDIA GeForce RTX 3090",   # 24GB
     "NVIDIA RTX A5000",          # 24GB
-    "NVIDIA RTX A4500",          # 20GB
-    "NVIDIA RTX A4000",          # 16GB
     "NVIDIA L4",                 # 24GB
 ]
 
