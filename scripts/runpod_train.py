@@ -35,7 +35,7 @@ def launch_pod() -> str:
         try:
             pod = runpod.create_pod(
                 name="grpo-stage2",
-                image_name="runpod/pytorch:2.4.0-py3.11-cuda12.4.1-devel",
+                image_name="runpod/pytorch:2.1.0-py3.10-cuda11.8.0-devel",
                 gpu_type_id=gpu,
                 cloud_type="SECURE",
                 gpu_count=1,

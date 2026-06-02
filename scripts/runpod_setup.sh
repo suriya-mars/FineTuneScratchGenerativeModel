@@ -10,6 +10,7 @@ rm -rf /workspace/project
 git clone https://github.com/suriya-mars/FineTuneScratchGenerativeModel.git /workspace/project
 cd /workspace/project
 
+python -c "import transformers; print('transformers:', transformers.__version__); import torch; print('torch:', torch.__version__)"
 pip install -q -r requirements_stage2.txt
 
 # Download train.csv
