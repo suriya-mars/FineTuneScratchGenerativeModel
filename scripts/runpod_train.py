@@ -22,21 +22,33 @@ SETUP_CMD = (
 
 
 
+GPU_PRIORITY = [
+    "NVIDIA GeForce RTX 3090",   # 24GB
+    "NVIDIA RTX A5000",          # 24GB
+    "NVIDIA RTX A4500",          # 20GB
+    "NVIDIA RTX A4000",          # 16GB
+    "NVIDIA L4",                 # 24GB
+]
+
 def launch_pod() -> str:
-    pod = runpod.create_pod(
-        name="grpo-stage2",
-        image_name="runpod/pytorch:2.4.0-py3.11-cuda12.4.1-devel",
-        gpu_type_id="NVIDIA GeForce RTX 3090",   # 24GB VRAM
-        cloud_type="SECURE",
-        gpu_count=1,
-        volume_in_gb=20,
-        container_disk_in_gb=20,
-        docker_args=SETUP_CMD,
-        env={"HF_TOKEN": os.environ.get("HF_TOKEN", "")},
-    )
-    pod_id = pod["id"]
-    print(f"Pod launched: {pod_id}")
-    return pod_id
+    for gpu in GPU_PRIORITY:
+        try:
+            pod = runpod.create_pod(
+                name="grpo-stage2",
+                image_name="runpod/pytorch:2.4.0-py3.11-cuda12.4.1-devel",
+                gpu_type_id=gpu,
+                cloud_type="SECURE",
+                gpu_count=1,
+                volume_in_gb=20,
+                container_disk_in_gb=20,
+                docker_args=SETUP_CMD,
+                env={"HF_TOKEN": os.environ.get("HF_TOKEN", "")},
+            )
+            print(f"Pod launched on {gpu}: {pod['id']}")
+            return pod["id"]
+        except Exception as e:
+            print(f"{gpu} unavailable: {e}")
+    raise RuntimeError("No GPUs available. Try again later.")
 
 
 def wait_for_completion(pod_id: str) -> None:
