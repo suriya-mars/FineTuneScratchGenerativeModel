@@ -109,7 +109,7 @@ def main() -> None:
 
         per_device_train_batch_size=4,
         num_generations=4,
-        max_completion_length=300,
+        max_completion_length=400,
         gradient_accumulation_steps=2,
         beta=0.01,
 
