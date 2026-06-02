@@ -146,6 +146,17 @@ def main() -> None:
     tokenizer.save_pretrained(str(final_dir))
     print(f"\nSaved Stage 2 model → {final_dir}")
 
+    hf_repo = "suriya-mars/qwen2.5-3b-wonderland-stage2"
+    hf_token = os.environ.get("HF_TOKEN")
+    if hf_token:
+        from huggingface_hub import HfApi
+        api = HfApi()
+        api.create_repo(hf_repo, repo_type="model", exist_ok=True)
+        api.upload_folder(folder_path=str(final_dir), repo_id=hf_repo, repo_type="model")
+        print(f"Uploaded Stage 2 adapter → https://huggingface.co/{hf_repo}")
+    else:
+        print("HF_TOKEN not set — skipping upload")
+
 
 if __name__ == "__main__":
     main()
